@@ -1,8 +1,11 @@
 """Module responsible for all the LLM client related implementations."""
 
+import os
+from dotenv import load_dotenv
 from pathlib import Path
 from typing import List, Dict
 from openai import OpenAI
+
 
 
 def load_system_prompt(filename: str = "system_prompt.txt") -> str:
@@ -28,10 +31,14 @@ def generate_response(
         {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {user_message}"},
     ]
     # TODO: Set context in messages
+    messages.append({"role": "user", "content": context})
     # TODO: Add chat history
+    messages.extend(conversation_history)
     # TODO: Creaet OpenAI Client
-
-    openai_client = OpenAI(api_key=openai_key)
+    load_dotenv()
+    openai_api_key = os.environ["OPENAI_API_KEY"]
+    vocareum_base_url = os.environ["VOCAREUM_BASE_URL"]
+    openai_client = OpenAI(api_key=openai_api_key, base_url=vocareum_base_url)
     # TODO: Send request to OpenAI
     response = openai_client.chat.completions.create(model=model, messages=messages)
     # Get assistant's response
