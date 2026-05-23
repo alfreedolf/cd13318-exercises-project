@@ -27,6 +27,8 @@ import time
 from datetime import datetime
 import argparse
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+from dotenv import load_dotenv()
+
 
 # Configure logging
 logging.basicConfig(
@@ -39,6 +41,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+load_dotenv()
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+OPENAI_BASE_URL = os.getenv('OPENAI_BASE_URL')
 class ChromaEmbeddingPipelineTextOnly:
     """Pipeline for creating ChromaDB collections with OpenAI embeddings - Text files only"""
     
@@ -61,9 +66,25 @@ class ChromaEmbeddingPipelineTextOnly:
             chunk_overlap: Overlap between chunks
         """
         # TODO: Initialize OpenAI client
+        self.__openai_client = OpenAI(api_key=openai_api_key, base_url=OPENAI_BASE_URL)
+        
         # TODO: Store configuration parameters
+        self.__config = {
+            'embedding_model': embedding_model,
+            'chunk_size': chunk_size,
+            'chunk_overlap': chunk_overlap,
+            'collection_name': collection_name
+        }                
         # TODO: Initialize ChromaDB client
+        self.__chroma_client = chromadb.Client(Settings(
+            chroma_db_impl="duckdb+parquet",
+            persist_directory=chroma_persist_directory
+        ))
         # TODO: Create or get collection
+        self.__collection = self.__chroma_client.create_collection(
+                    name=collection_name,
+                    embedding_function=None,  # We'll handle embeddings manually
+                )
     
     def chunk_text(self, text: str, metadata: Dict[str, Any]) -> List[Tuple[str, Dict[str, Any]]]:
         """
@@ -77,10 +98,21 @@ class ChromaEmbeddingPipelineTextOnly:
             List of (chunk_text, chunk_metadata) tuples
         """
         # TODO: Handle short texts that don't need chunking
+        if len(text) <= self.__config['chunk_size']:
+            # No chunking needed
+            return [(text, metadata)]
+
         # TODO: Implement chunking logic with overlap
+        chunks = []
+        for i in range(0, len(text), self.__config['chunk_size'] - self.__config['chunk_overlap']):
+            chunk = text[i:i + self.__config['chunk_size']]
+            chunk_metadata = metadata.copy()
+            chunk_metadata['chunk_index'] = len(chunks)
+            chunk_metadata['chunk_size'] = len(chunk)
+            chunks.append((chunk, chunk_metadata))
+        return chunks
         # TODO: Try to break at sentence boundaries
         # TODO: Create metadata for each chunk
-        pass
     
     def check_document_exists(self, doc_id: str) -> bool:
         """
@@ -93,8 +125,11 @@ class ChromaEmbeddingPipelineTextOnly:
             True if document exists, False otherwise
         """
         # TODO: Query collection for document ID
+        results = self.__collection.query(ids=[doc_id], n_results=1)
         # TODO: Return True if exists, False otherwise
-        pass
+        if len(results['ids']) > 0:
+            return True
+        return False
     
     def update_document(self, doc_id: str, text: str, metadata: Dict[str, Any]) -> bool:
         """
@@ -137,16 +172,19 @@ class ChromaEmbeddingPipelineTextOnly:
         """
         try:
             # Get all documents
-            all_docs = self.collection.get()
+            all_docs = self.__collection.get()
+            if not all_docs['ids']:
+                logger.info(f"No documents found in collection")
+                return 0
             
             # Find documents matching the source pattern
             ids_to_delete = []
-            for i, metadata in enumerate(all_docs['metadatas']):
-                if source_pattern in metadata.get('source', ''):
+            for i, metadata in enumerate(all_docs['metadatas'] or []):
+                if source_pattern in str(metadata.get('source', '')):
                     ids_to_delete.append(all_docs['ids'][i])
             
             if ids_to_delete:
-                self.collection.delete(ids=ids_to_delete)
+                self.__collection.delete(ids=ids_to_delete)
                 logger.info(f"Deleted {len(ids_to_delete)} documents matching source pattern: {source_pattern}")
                 return len(ids_to_delete)
             else:
@@ -172,11 +210,14 @@ class ChromaEmbeddingPipelineTextOnly:
             mission = self.extract_mission_from_path(file_path)
             
             # Get all documents
-            all_docs = self.collection.get()
+            all_docs = self.__collection.get()
+            if not all_docs['ids']:
+                logger.info(f"No documents found in collection")
+                return []
             
             # Find documents from this file
             file_doc_ids = []
-            for i, metadata in enumerate(all_docs['metadatas']):
+            for i, metadata in enumerate(all_docs['metadatas'] or []):
                 if (metadata.get('source') == source and 
                     metadata.get('mission') == mission):
                     file_doc_ids.append(all_docs['ids'][i])
