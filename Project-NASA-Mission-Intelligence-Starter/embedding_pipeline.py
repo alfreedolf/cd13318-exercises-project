@@ -27,7 +27,7 @@ import time
 from datetime import datetime
 import argparse
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
-from dotenv import load_dotenv()
+from dotenv import load_dotenv
 
 
 # Configure logging
@@ -148,7 +148,7 @@ class ChromaEmbeddingPipelineTextOnly:
             embedding = self.get_embedding(text)
             
             # Update the document
-            self.collection.update(
+            self.__collection.update(
                 ids=[doc_id],
                 documents=[text],
                 metadatas=[metadata],
@@ -239,9 +239,18 @@ class ChromaEmbeddingPipelineTextOnly:
             Embedding vector
         """
         # TODO: Call OpenAI embeddings API
-        # TODO: Return embedding vector
+        try:
+            create_embedding_response = self.__openai_client.embeddings.create(
+                input=text,
+                model=self.__config['embedding_model']
+            )
+            # TODO: Return embedding vector
+            return create_embedding_response.data[0].embedding
         # TODO: Add error handling
-        pass
+        except Exception as e:
+            logger.error(f"Error generating embedding: {e}")
+            raise Exception(f"Failed to generate embedding: {e}")
+        
 
     def generate_document_id(self, file_path: Path, metadata: Dict[str, Any]) -> str:
         """
@@ -249,9 +258,13 @@ class ChromaEmbeddingPipelineTextOnly:
         This allows for document updates without changing IDs
         """
         # TODO: Create consistent ID format
+        file_hash = hashlib.md5(str(file_path).encode()).hexdigest()[:8]
         # TODO: Use mission, source, and chunk_index
+        mission = metadata.get('mission', 'unknown')
+        source = metadata.get('source', 'unknown')
+        chunk_index = metadata.get('chunk_index', 0)
+        return f"{mission}_{source}_{chunk_index}_{file_hash}"
         # Format: mission_source_chunk_0001
-        pass
     
     def process_text_file(self, file_path: Path) -> List[Tuple[str, Dict[str, Any]]]:
         """
@@ -347,7 +360,7 @@ class ChromaEmbeddingPipelineTextOnly:
         else:
             return 'general_document'
     
-    def scan_text_files_only(self, base_path: str) -> List[Path]:
+    def scan_text_files_only(self, base_path: Path) -> List[Path]:
         """
         Scan data directories for text files only (avoiding JSON duplicates)
         
@@ -425,14 +438,60 @@ class ChromaEmbeddingPipelineTextOnly:
         stats = {'added': 0, 'updated': 0, 'skipped': 0}
         
         # TODO: Handle different update modes (skip, update, replace)
+        if update_mode == 'replace':
+            # Delete all existing documents from this file first
+            file_doc_ids = self.get_file_documents(file_path)
+            if file_doc_ids:
+                self.__collection.delete(ids=file_doc_ids)
+                logger.info(f"Deleted {len(file_doc_ids)} existing documents from {file_path}")
+        elif update_mode == 'skip':
+            # Check which documents already exist
+            existing_ids = set()
+            for text, metadata in documents:
+                doc_id = self.generate_document_id(file_path, metadata)
+                if doc_id in existing_ids:
+                    continue  # Skip duplicate IDs within same batch
+                # Check if this ID exists in collection
+                try:
+                    result = self.__collection.get(ids=[doc_id])
+                    if result['ids']:
+                        stats['skipped'] += 1
+                        continue
+                except Exception:
+                    pass  # If get fails, assume it doesn't exist
+                existing_ids.add(doc_id)
+        elif update_mode == 'update':
+            # For update mode, we'll let Chroma handle updates by using upsert
+            # which will update if exists or insert if not
+            pass
         # TODO: Process documents in batches
+        batch_docs = []
         # TODO: For each document:
+        for text, metadata in documents:
+            doc_id = self.generate_document_id(file_path, metadata)
+            embedding = self.get_embedding(text)
+            batch_docs.append((doc_id, text, metadata, embedding))
+            
+            if len(batch_docs) >= batch_size:
+                # Process the batch
+                ids, texts, metadatas, embeddings = zip(*batch_docs)
+                try:
+                    self.__collection.add(
+                        ids=ids,
+                        documents=texts,
+                        metadatas=metadatas,
+                        embeddings=embeddings
+                    )
+                    stats['added'] += len(ids)
+                    logger.debug(f"Added batch of {len(ids)} documents from {file_path}")
+                except Exception as e:
+                    logger.error(f"Error adding batch to collection: {e}")
+                batch_docs = []
         #   - Generate document ID
         #   - Check if exists
         #   - Get embedding
         #   - Add or update in collection
-        # TODO: Return statistics
-
+        # TODO: Return statistics        
         return stats
     
     def process_all_text_data(self, base_path: str, update_mode: str = 'skip') -> Dict[str, int]:
@@ -460,7 +519,45 @@ class ChromaEmbeddingPipelineTextOnly:
         }
         
         # TODO: Get files to process
+        files_to_process = self.scan_text_files_only(Path(base_path))
         # TODO: Loop through each file
+        for file_path in files_to_process:
+            try:
+                # Process the file and get chunks
+                chunks = self.process_text_file(file_path)
+                if not chunks:
+                    logger.info(f"No valid text found in {file_path}, skipping.")
+                    continue
+                
+                # Add documents to collection
+                result_stats = self.add_documents_to_collection(chunks, file_path, update_mode=update_mode)
+                
+                # Update overall stats
+                stats['files_processed'] += 1
+                stats['documents_added'] += result_stats['added']
+                stats['documents_updated'] += result_stats['updated']
+                stats['documents_skipped'] += result_stats['skipped']
+                stats['total_chunks'] += len(chunks)
+                
+                # Update mission-specific stats
+                mission = self.extract_mission_from_path(file_path)
+                if mission not in stats['missions']:
+                    stats['missions'][mission] = {
+                        'files': 0,
+                        'chunks': 0,
+                        'added': 0,
+                        'updated': 0,
+                        'skipped': 0
+                    }
+                stats['missions'][mission]['files'] += 1
+                stats['missions'][mission]['chunks'] += len(chunks)
+                stats['missions'][mission]['added'] += result_stats['added']
+                stats['missions'][mission]['updated'] += result_stats['updated']
+                stats['missions'][mission]['skipped'] += result_stats['skipped']
+                
+            except Exception as e:
+                logger.error(f"Error processing file {file_path}: {e}")
+                stats['errors'] += 1
         # TODO: Process file and add to collection
         # TODO: Update statistics
         # TODO: Handle errors gracefully
@@ -470,7 +567,15 @@ class ChromaEmbeddingPipelineTextOnly:
     def get_collection_info(self) -> Dict[str, Any]:
         """Get information about the ChromaDB collection"""
         # TODO: Return collection name, document count, metadata
-        pass
+        try:
+            collection_info = {
+                'collection_name': self.__config['collection_name'],
+                'document_count': self.__collection.count(),
+            }
+            return collection_info
+        except Exception as e:
+            logger.error(f"Error getting collection info: {e}")
+            return {'error': str(e)}
     
     def query_collection(self, query_text: str, n_results: int = 5) -> Dict[str, Any]:
         """
@@ -484,13 +589,22 @@ class ChromaEmbeddingPipelineTextOnly:
             Query results
         """
         # TODO: Perform test query and return results
-        pass
+        try:
+            results = self.__collection.query(
+                query_texts=[query_text],
+                n_results=n_results,
+                include=['documents', 'metadatas', 'distances']
+            )
+            return results
+        except Exception as e:
+            logger.error(f"Error querying collection: {e}")
+            return {'error': str(e)}
     
     def get_collection_stats(self) -> Dict[str, Any]:
         """Get detailed statistics about the collection"""
         try:
             # Get all documents to analyze
-            all_docs = self.collection.get()
+            all_docs = self.__collection.get()
             
             if not all_docs['metadatas']:
                 return {'error': 'No documents in collection'}
