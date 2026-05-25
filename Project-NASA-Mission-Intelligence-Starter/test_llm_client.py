@@ -69,25 +69,26 @@ class DummyChat:
 
 
 class DummyOpenAI:
-    def __init__(self, api_key, response=None):
+    def __init__(self, api_key, base_url, response=None):
         self.api_key = api_key
+        self.base_url = base_url
         self.chat = DummyChat(response)
 
 
-def test_generate_response_calls_openai_and_returns_assistant_message():
-    # system_prompt = "System prompt for NASA."
-    # monkeypatch.setattr(llm_client, "load_system_prompt", lambda: system_prompt)
+def test_generate_response_calls_openai_and_returns_assistant_message(monkeypatch):
+    system_prompt = "System prompt for NASA."
+    monkeypatch.setattr(llm_client, "load_system_prompt", lambda: system_prompt)
 
     assistant_text = "Roger that, Commander."
-    # response = DummyCompletionResult(assistant_text)
+    response = DummyCompletionResult(assistant_text)
     captured = {}
 
-    # def fake_openai_factory(api_key):
-    #     client = DummyOpenAI(api_key, response=response)
-    #     captured["client"] = client
-    #     return client
+    def fake_openai_factory(api_key, base_url):
+        client = DummyOpenAI(api_key, base_url, response=response)
+        captured["client"] = client
+        return client
 
-    # monkeypatch.setattr(llm_client, "OpenAI", fake_openai_factory)
+    monkeypatch.setattr(llm_client, "OpenAI", fake_openai_factory)
 
     user_message = "What is our next step?"
     context = "We are currently in lunar orbit."
@@ -102,9 +103,9 @@ def test_generate_response_calls_openai_and_returns_assistant_message():
         context=context,
         conversation_history=conversation_history
     )
-
+    last_message_position = -(len(conversation_history) + 2)
     assert result == assistant_text
     assert captured["client"].chat.completions.last_messages[0]["role"] == "system"
-    assert captured["client"].chat.completions.last_messages[-1]["content"] == (
+    assert captured["client"].chat.completions.last_messages[last_message_position]["content"] == (
         f"Context:\n{context}\n\nQuestion: {user_message}"
     )
