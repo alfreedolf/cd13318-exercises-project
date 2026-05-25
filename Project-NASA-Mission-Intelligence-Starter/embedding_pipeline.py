@@ -27,7 +27,9 @@ import time
 from datetime import datetime
 import argparse
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+
 from dotenv import load_dotenv
+from typing import Dict, List, Any, Optional, Tuple, cast
 
 
 # Configure logging
@@ -42,7 +44,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+OPENAI_API_KEY = os.getenv('OPENAI_API_VOCAREUM_KEY')
 OPENAI_BASE_URL = os.getenv('OPENAI_BASE_URL')
 class ChromaEmbeddingPipelineTextOnly:
     """Pipeline for creating ChromaDB collections with OpenAI embeddings - Text files only"""
@@ -202,7 +204,7 @@ class ChromaEmbeddingPipelineTextOnly:
                 
         except Exception as e:
             logger.error(f"Error deleting documents by source: {e}")
-            return 0
+            return -1
     
     def get_file_documents(self, file_path: Path) -> List[str]:
         """
@@ -604,7 +606,7 @@ class ChromaEmbeddingPipelineTextOnly:
                 n_results=n_results,
                 include=['documents', 'metadatas', 'distances']
             )
-            return results
+            return cast(Dict[str, Any], results)
         except Exception as e:
             logger.error(f"Error querying collection: {e}")
             return {'error': str(e)}
@@ -655,7 +657,7 @@ def main():
     """Main function"""
     parser = argparse.ArgumentParser(description='ChromaDB Embedding Pipeline for NASA Data')
     parser.add_argument('--data-path', default='.', help='Path to data directories')
-    parser.add_argument('--openai-key', required=True, help='OpenAI API key')
+    parser.add_argument('--openai-key', required=True, default=OPENAI_API_KEY, help='OpenAI API key')
     parser.add_argument('--chroma-dir', default='./chroma_db_openai', help='ChromaDB persist directory')
     parser.add_argument('--collection-name', default='nasa_space_missions_text', help='Collection name')
     parser.add_argument('--embedding-model', default='text-embedding-3-small', help='OpenAI embedding model')

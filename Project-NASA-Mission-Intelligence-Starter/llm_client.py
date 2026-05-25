@@ -36,7 +36,7 @@ def generate_response(
     messages.extend(conversation_history)
     # TODO: Creaet OpenAI Client
     load_dotenv()
-    openai_api_key = os.environ["OPENAI_API_KEY"]
+    openai_api_key = os.environ["OPENAI_API_VOCAREUM_KEY"]
     vocareum_base_url = os.environ["VOCAREUM_BASE_URL"]
     openai_client = OpenAI(api_key=openai_api_key, base_url=vocareum_base_url)
     # TODO: Send request to OpenAI
