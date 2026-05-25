@@ -148,7 +148,7 @@ def main():
         openai_key = st.text_input(
             "OpenAI API Key", 
             type="password",
-            value=os.getenv("OPENAI_API_KEY", ""),
+            value=os.getenv("OPENAI_API_VOCAREUM_KEY", ""),
             help="Enter your OpenAI API key"
         )
         
@@ -183,8 +183,8 @@ def main():
     with st.spinner("Initializing RAG system..."):
 
         collection, success, error = initialize_rag_system(
-            selected_backend["directory"], 
-            selected_backend["collection_name"]
+            selected_backend["path"], 
+            selected_backend["collection"]
         )
     
     if not success:

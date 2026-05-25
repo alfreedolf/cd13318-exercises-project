@@ -8,7 +8,7 @@ import pytest
 
 # retrieving key from .env file
 load_dotenv()
-opena_api_key = os.environ["OPENAI_API_KEY"]
+opena_api_key = os.environ["OPENAI_API_VOCAREUM_KEY"]
 
 # Ensure the module path is available when pytest runs from the repository root.
 ROOT = Path(__file__).resolve().parent
@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT))
 # Mock the openai package so the module imports successfully in environments
 # where OpenAI is not installed.
 fake_openai = types.ModuleType("openai")
-fake_openai.OpenAI = lambda api_key: None
+fake_openai.OpenAI = lambda api_key, base_url: None
 sys.modules["openai"] = fake_openai
 
 import llm_client
