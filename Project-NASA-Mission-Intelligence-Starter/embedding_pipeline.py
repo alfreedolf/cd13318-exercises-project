@@ -76,10 +76,9 @@ class ChromaEmbeddingPipelineTextOnly:
             'collection_name': collection_name
         }                
         # TODO: Initialize ChromaDB client
-        self.__chroma_client = chromadb.Client(Settings(
-            chroma_db_impl="duckdb+parquet",
-            persist_directory=chroma_persist_directory
-        ))
+        self.__chroma_client = chromadb.PersistentClient(
+            path=chroma_persist_directory
+        )
         # TODO: Create or get collection
         self.__collection = self.__chroma_client.create_collection(
                     name=collection_name,
@@ -105,14 +104,24 @@ class ChromaEmbeddingPipelineTextOnly:
         # TODO: Implement chunking logic with overlap
         chunks = []
         for i in range(0, len(text), self.__config['chunk_size'] - self.__config['chunk_overlap']):
-            chunk = text[i:i + self.__config['chunk_size']]
+            # TODO: Try to break at sentence boundaries
+            end_idx = min(i + self.__config['chunk_size'], len(text))
+            if end_idx < len(text):
+                # Try to find last period before end_idx for better chunking
+                last_period = text.rfind('.', i, end_idx)
+                if last_period != -1 and last_period > i:
+                    end_idx = last_period + 1  # Include the period in the chunk
+                    end_idx = min(end_idx, len(text))
+                    end_idx = max(end_idx, i + 1)  # Ensure we make progress
+            chunk = text[i:end_idx]
+            # TODO: Create metadata for each chunk
             chunk_metadata = metadata.copy()
             chunk_metadata['chunk_index'] = len(chunks)
             chunk_metadata['chunk_size'] = len(chunk)
             chunks.append((chunk, chunk_metadata))
         return chunks
-        # TODO: Try to break at sentence boundaries
-        # TODO: Create metadata for each chunk
+        
+        
     
     def check_document_exists(self, doc_id: str) -> bool:
         """
