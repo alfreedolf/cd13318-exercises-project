@@ -82,10 +82,10 @@ class ChromaEmbeddingPipelineTextOnly:
             path=chroma_persist_directory
         )
         # TODO: Create or get collection
-        self.__collection = self.__chroma_client.create_collection(
-                    name=collection_name,
-                    embedding_function=None,  # We'll handle embeddings manually
-                )
+        self.__collection = self.__chroma_client.get_or_create_collection(
+            name=collection_name,
+            embedding_function=None
+        )
     
     def chunk_text(self, text: str, metadata: Dict[str, Any]) -> List[Tuple[str, Dict[str, Any]]]:
         """
@@ -488,10 +488,10 @@ class ChromaEmbeddingPipelineTextOnly:
                 ids, texts, metadatas, embeddings = zip(*batch_docs)
                 try:
                     self.__collection.add(
-                        ids=ids,
-                        documents=texts,
-                        metadatas=metadatas,
-                        embeddings=embeddings
+                        ids=list(ids),
+                        documents=list(texts),
+                        metadatas=list(metadatas),
+                        embeddings=list(embeddings)
                     )
                     stats['added'] += len(ids)
                     logger.debug(f"Added batch of {len(ids)} documents from {file_path}")
