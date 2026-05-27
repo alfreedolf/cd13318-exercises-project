@@ -1,0 +1,53 @@
+# Evaluation Dataset for GenAI RAG System
+# Focus: Apollo 11, Apollo 13, and Challenger NASA missions
+
+Question: What was the significance of Apollo 11?
+Expected Response: Apollo 11 was the first NASA mission that actually landed on the moon.
+
+Question: Who were the astronauts on Apollo 11?
+Expected Response: The Apollo 11 crew consisted of three astronauts: Neil Armstrong (commander), Buzz Aldrin (lunar module pilot), and Michael Collins (command module pilot). Neil Armstrong was the first human to step on the Moon, followed by Buzz Aldrin.
+
+Question: What famous words did Neil Armstrong say when he first stepped on the Moon?
+Expected Response: Neil Armstrong's famous words were: "That's one small step for [a] man, one giant leap for mankind." He said this on July 20, 1969, when he became the first human to walk on the lunar surface.
+
+Question: What happened during the Apollo 13 mission?
+Expected Response: Apollo 13 was launched on April 11, 1970, with the goal of landing on the Moon. However, two days into the mission, an oxygen tank exploded in the service module, crippling the spacecraft. The mission was aborted, and the crew had to use the lunar module as a "lifeboat" to survive. Despite the crisis, astronauts Jim Lovell, Jack Swigert, and Fred Haise safely returned to Earth on April 17, 1970. It became known as a "successful failure" because no lives were lost despite the catastrophic equipment failure.
+
+Question: Who were the astronauts on Apollo 13?
+Expected Response: The Apollo 13 crew consisted of three astronauts: Jim Lovell (commander), Jack Swigert (command module pilot), and Fred Haise (lunar module pilot). All three survived the mission despite the oxygen tank explosion that occurred during their journey to the Moon.
+
+Question: What was the main problem that occurred on Apollo 13?
+Expected Response: The main problem on Apollo 13 was an explosion of an oxygen tank in the service module, which occurred on April 13, 1970, two days after launch. The explosion ruptured the oxygen tank and damaged another, depriving the spacecraft of oxygen needed for breathing and for generating electricity. This forced the crew to abort the lunar landing and focus entirely on returning safely to Earth.
+
+Question: When did the Challenger disaster occur?
+Expected Response: The Challenger disaster occurred on January 28, 1986, when Space Shuttle Challenger broke apart 73 seconds into its flight, killing all seven crew members aboard. The spacecraft disintegrated over the Atlantic Ocean, off the coast of central Florida.
+
+Question: Who were the crew members of the Challenger disaster?
+Expected Response: The Challenger crew consisted of seven astronauts: Francis "Dick" Scobee (commander), Michael J. Smith (pilot), Ronald McNair (mission specialist), Ellison Onizuka (mission specialist), Judith Resnik (mission specialist), Gregory Jarvis (payload specialist), and Christa McAuliffe (payload specialist and teacher). Christa McAuliffe was scheduled to be the first teacher in space.
+
+Question: What caused the Challenger disaster?
+Expected Response: The Challenger disaster was caused by the failure of an O-ring seal in the right solid rocket booster. The O-ring failed due to unusually cold temperatures on the morning of the launch, which made the rubber material less flexible. Hot gases escaped through the failed seal, causing the booster to break apart and leading to the catastrophic disintegration of the entire shuttle 73 seconds after launch.
+
+Question: How long did Apollo 11 spend on the Moon's surface?
+Expected Response: Apollo 11 spent approximately 21 hours and 36 minutes on the Moon's surface. Neil Armstrong and Buzz Aldrin landed the Lunar Module Eagle on July 20, 1969, at 20:17 UTC and lifted off from the Moon on July 21, 1969, at 17:54 UTC to rendezvous with Michael Collins in the command module.
+
+Question: What was the name of the Apollo 11 lunar module?
+Expected Response: The Apollo 11 lunar module was named "Eagle." This name was fitting since the eagle is a symbol of America, and it was the spacecraft that carried Neil Armstrong and Buzz Aldrin to the Moon's surface while Michael Collins remained in orbit in the command module "Columbia."
+
+Question: Where did Apollo 11 land on the Moon?
+Expected Response: Apollo 11 landed in the Sea of Tranquility (Mare Tranquillitatis) on the Moon. The specific landing site was chosen because it was a relatively flat and smooth area, which made it safer for the first lunar landing attempt.
+
+Question: What happened to the Challenger crew after the disaster?
+Expected Response: All seven crew members of the Challenger died in the disaster. The shuttle broke apart 73 seconds after launch due to O-ring failure in the solid rocket booster. The crew module remained intact briefly after the breakup but ultimately could not survive the forces involved. This tragedy led to a 32-month suspension of the Space Shuttle program and significant changes to NASA's safety protocols and organizational culture.
+
+Question: How many people died in the Apollo 11 mission?
+Expected Response: No one died in the Apollo 11 mission. It was a completely successful mission with all three astronauts (Neil Armstrong, Buzz Aldrin, and Michael Collins) returning safely to Earth. The mission achieved its goal of landing humans on the Moon for the first time in history.
+
+Question: What was the landing score of Bayern Munich in the 2024 Bundesliga season?
+Expected Response: I specialize in Apollo 11, Apollo 13, and Challenger STS-51-L missions. Unfortunately, I do not have any information related to this topic.
+
+Question: Who is the current CEO of Tesla in 2026?
+Expected Response: I specialize in Apollo 11, Apollo 13, and Challenger STS-51-L missions. Unfortunately, I do not have any information related to this topic.
+
+Question: What is the capital city of Australia?
+Expected Response: I specialize in Apollo 11, Apollo 13, and Challenger STS-51-L missions. Unfortunately, I do not have any information related to this topic.
