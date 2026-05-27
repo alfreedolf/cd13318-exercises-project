@@ -17,6 +17,8 @@ import llm_client
 
 from pathlib import Path
 from typing import Dict, List, Optional
+from chromadb import Collection
+
 
 # RAGAS imports
 try:
@@ -25,6 +27,9 @@ try:
 except ImportError:
     RAGAS_AVAILABLE = False
     st.warning("RAGAS not available. Install with: pip install ragas")
+
+
+RAGAS_INIT_SUCCESS_MSG = "Successfully initialized RAG System!"
 
 # Page configuration
 st.set_page_config(
@@ -39,13 +44,15 @@ def discover_chroma_backends() -> Dict[str, Dict[str, str]]:
     return rag_client.discover_chroma_backends()
 
 #@st.cache_resource
-def initialize_rag_system(chroma_dir: str, collection_name: str):
-    """Initialize the RAG system with specified backend (cached for performance)"""
-
+def initialize_rag_system(chroma_dir: str, collection_name: str) -> tuple[Collection | None, bool, str]:
+    """Initialize the RAG system with specified backend (cached for performance).
+    Returns collection object, success status, and message.
+    """
     try:
-       return rag_client.initialize_rag_system(chroma_dir, collection_name)
+       return rag_client.initialize_rag_system(chroma_dir, collection_name), True, RAGAS_INIT_SUCCESS_MSG
     except Exception as e:
         return None, False, str(e)
+        
 
 def retrieve_documents(collection, query: str, n_results: int = 3, 
                       mission_filter: Optional[str] = None) -> Optional[Dict]:
@@ -62,14 +69,14 @@ def format_context(documents: List[str], metadatas: List[Dict]) -> str:
     return rag_client.format_context(documents, metadatas)
 
 def generate_response(openai_key, user_message: str, context: str, 
-                     conversation_history: List[Dict], model: str = "gpt-3.5-turbo") -> str:
+                     conversation_history: List[Dict], model: str = "gpt-3.5-turbo") -> str | None:
     """Generate response using OpenAI with context"""
     try:
         return llm_client.generate_response(openai_key, user_message, context, conversation_history, model)
     except Exception as e:
         return f"Error generating response: {e}"
 
-def evaluate_response_quality(question: str, answer: str, contexts: List[str]) -> Dict[str, float]:
+def evaluate_response_quality(question: str, answer: str, contexts: List[str]) -> Dict[str, float] | Dict[str, str] :
     """Evaluate response quality using RAGAS metrics"""
     try:
         return ragas_evaluator.evaluate_response_quality(question, answer, contexts)
@@ -127,7 +134,7 @@ def main():
         
         if not available_backends:
             st.error("No ChromaDB backends found!")
-            st.info("Please run the embedding pipeline first:\n`python run_text_embedding.py`")
+            st.info("Please run the embedding pipeline first:\n`python embedding_pipeline.py`")
             st.stop()
         
         # Backend selection
@@ -148,7 +155,7 @@ def main():
         openai_key = st.text_input(
             "OpenAI API Key", 
             type="password",
-            value=os.getenv("OPENAI_API_KEY", ""),
+            value=os.getenv("OPENAI_API_VOCAREUM_KEY", ""),
             help="Enter your OpenAI API key"
         )
         
@@ -183,8 +190,8 @@ def main():
     with st.spinner("Initializing RAG system..."):
 
         collection, success, error = initialize_rag_system(
-            selected_backend["directory"], 
-            selected_backend["collection_name"]
+            selected_backend["path"], 
+            selected_backend["collection"]
         )
     
     if not success:
