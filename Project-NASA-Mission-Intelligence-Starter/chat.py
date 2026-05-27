@@ -16,8 +16,9 @@ import rag_client
 import llm_client
 
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 from chromadb import Collection
+from math import isnan, isinf
 
 
 # RAGAS imports
@@ -83,32 +84,85 @@ def evaluate_response_quality(question: str, answer: str, contexts: List[str]) -
     except Exception as e:
         return {"error": f"Evaluation failed: {str(e)}"}
 
+
+def get_safe_score_value(x: Union[float, int, None]) -> float:
+    """Make sure score is a valid float between 0 and 1, replacing NaN/inf with 0.0
+
+    Args:
+        x (float | None): the score value to show
+
+    Returns:
+        float: a safe valuet o be represented by streamplit
+    """
+    if x is None:
+        return 0.0
+    x = float(x)
+    if isnan(x) or isinf(x):
+        return 0.0
+    return max(0.0, min(1.0, x))
+
+def score_color(pct: float) -> str:
+    """
+    Assign color to a score based on its value.
+    Assign a custom colormap to represent colors of metrics:
+    < 60: red, 60–80: orange, >= 80: green
+
+    Args:
+        pct (float): percentage value of a metric in [0, 100]
+
+    Returns:
+        str: color string
+    """
+    if pct < 60:
+        return "#c62828"   # red
+    elif pct < 80:
+        return "#ef6c00"   # orange
+    else:
+        return "#2e7d32"   # green
+
 def display_evaluation_metrics(scores: Dict[str, float]):
-    """Display evaluation metrics in the sidebar"""
+    """
+    Display evaluation metrics in the sidebar with color coding and progress bars.
+    Args:
+        scores (Dict[str, float]): A dictionary of metric names and their corresponding scores.
+    Returns:
+        None
+    """
+    
     if "error" in scores:
         st.sidebar.error(f"Evaluation Error: {scores['error']}")
         return
-    
+
     st.sidebar.subheader("📊 Response Quality")
-    
+
     for metric_name, score in scores.items():
         if isinstance(score, (int, float)):
-            # Color code based on score
-            if score >= 0.8:
-                color = "green"
-            elif score >= 0.6:
-                color = "orange"
-            else:
-                color = "red"
-            
+            pct = float(score) * 100.0
+            safe_score = get_safe_score_value(score)
+            color = score_color(pct)
+
+            # Simple numeric metric, no weird delta semantics
             st.sidebar.metric(
                 label=metric_name.replace('_', ' ').title(),
-                value=f"{score:.3f}",
-                delta=None
+                value=f"{pct:.1f} %",
+                delta=None,
             )
-            
-            # Add progress bar
-            st.sidebar.progress(score)
+
+            # Colored bar just above the progress bar
+            st.sidebar.markdown(
+                f"""
+                <div style="
+                    height:0.25rem;
+                    border-radius:999px;
+                    background-color:{color};
+                    margin-bottom:0.25rem;
+                "></div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            st.sidebar.progress(safe_score)
+
 
 def main():
     st.title("🚀 NASA Space Mission Chat with Evaluation")

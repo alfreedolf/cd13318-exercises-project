@@ -19,55 +19,67 @@ except ImportError:
     RAGAS_AVAILABLE = False
 
 
-def evaluate_response_quality(question: str, answer: str, contexts: List[str]) -> Dict[str, float] | Dict[str, str] :
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+EVALUATOR_MODEL = os.environ.get("EVALUATOR_MODEL", "gpt-3.5-turbo")
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
+EMBEDDING_SIZE = int(os.environ.get("EMBEDDING_SIZE", "386"))
+
+def evaluate_response_quality(question: str, answer: str, contexts: List[str], reference_contexts: List[str]|None=None) -> Dict[str, float] | Dict[str, str] :
     """Evaluate response quality using RAGAS metrics"""
     if not RAGAS_AVAILABLE:
         return {"error": "RAGAS not available"}
 
     # 1) Create evaluator LLM (sync) and wrap it for Ragas
-    #    You can swap "gpt-3.5-turbo" for your env var later.
     chat_llm = ChatOpenAI(
-        model="gpt-3.5-turbo",
+        model=EVALUATOR_MODEL,
         temperature=0,
+        api_key=OPENAI_API_KEY, 
     )
     evaluator_llm = LangchainLLMWrapper(chat_llm)
 
     # 2) Create evaluator embeddings and wrap them
     #    Replace "text-embedding-3-small" with your env var if needed.
     lc_embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-small",
+        model=EMBEDDING_MODEL,
+        dimensions=EMBEDDING_SIZE, 
+        api_key=OPENAI_API_KEY,
     )
     evaluator_embeddings = LangchainEmbeddingsWrapper(lc_embeddings)
 
     # 3) Define metrics (some use LLM, some use embeddings, BLEU/ROUGE are non-LLM)
+    metrics = []
     bleu_metric = BleuScore()
-    # context_precision_metric = NonLLMContextPrecisionWithReference()
+    metrics.append(bleu_metric)
+    if reference_contexts is not None:
+        context_precision_metric = NonLLMContextPrecisionWithReference()
+        metrics.append(context_precision_metric)
     response_relevancy_metric = ResponseRelevancy(
         llm=evaluator_llm,
         embeddings=evaluator_embeddings,
     )
-    faithfulness_metric = Faithfulness(
-        llm=evaluator_llm,
-    )
+    metrics.append(response_relevancy_metric)
+    faithfulness_metric = Faithfulness(llm=evaluator_llm)
+    metrics.append(faithfulness_metric)
     rouge_metric = RougeScore()
+    metrics.append(rouge_metric)
 
-    metrics = [
-        bleu_metric,
-        # context_precision_metric,
-        response_relevancy_metric,
-        faithfulness_metric,
-        rouge_metric,
-    ]
 
     # 4) Build a SingleTurnSample for this one Q/A pair
     sample = SingleTurnSample(
         user_input=question,
         response=answer,
         retrieved_contexts=contexts,
-        reference=answer,  # if you have a separate ground truth, use that instead
+        reference=answer,
+        reference_contexts=reference_contexts,
     )
-    
+
     evaluation_dataset = EvaluationDataset(samples=[sample])
+
 
     # 5) Evaluate (synchronous) — returns a pandas DataFrame-like object
     result_df = evaluate(
