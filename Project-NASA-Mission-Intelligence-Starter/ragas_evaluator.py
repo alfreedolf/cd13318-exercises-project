@@ -5,22 +5,20 @@ import os
 
 from openai import OpenAI
 from ragas.llms import llm_factory
+from ragas.embeddings import OpenAIEmbeddings
 
-from ragas.embeddings import embedding_factory
+load_dotenv()
+OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+EVALUATOR_MODEL = os.environ["EVALUATOR_MODEL"]
+EMBEDDING_MODEL = os.environ["EMBEDDING_MODEL"]
+EMBEDDING_SIZE = int(os.environ["EMBEDDING_SIZE"])
 
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-
-
-EVALUATOR_MODEL = "gpt-4o-mini"
-# RAGAS imports
+# RAGAS imports - modern API
 try:
-    from ragas import SingleTurnSample, EvaluationDataset, evaluate
-    from typing import Sequence, cast
-    from ragas.metrics import Metric
     from ragas.metrics.collections import (
         BleuScore,
-        ContextPrecisionWithReference,   # renamed from NonLLMContextPrecisionWithReference
-        AnswerRelevancy,                 # renamed from ResponseRelevancy
+        ContextPrecisionWithReference,
+        AnswerRelevancy,
         Faithfulness,
         RougeScore,
     )
@@ -28,63 +26,77 @@ try:
 except ImportError:
     RAGAS_AVAILABLE = False
 
+
 def evaluate_response_quality(question: str, answer: str, contexts: List[str]) -> Dict[str, float] | Dict[str, str]:
     """Evaluate response quality using RAGAS metrics"""
     if not RAGAS_AVAILABLE:
         return {"error": "RAGAS not available"}
     else:
-    
-        # TODO: Create evaluator LLM with model gpt-3.5-turbo
-        # evaluator LLM for collections metrics
-        load_dotenv()
-        openai_api_key = os.environ["OPENAI_API_KEY"]
-        openai_client = OpenAI(api_key=openai_api_key)  # uses OPENAI_API_KEY
+        openai_client = OpenAI(api_key=OPENAI_API_KEY)
         evaluator_llm = llm_factory(
-                                    model=EVALUATOR_MODEL,   # or "gpt-4o" etc.
-                                    client=openai_client,  # required
-                                    # provider="openai"     # default is "openai"
-                                    )
-        # TODO: Create evaluator_embeddings with model test-embedding-3-small
-        # Modern embeddings
-        evaluator_embeddings = embedding_factory(
-            provider="openai",                      # or omit, defaults to "openai"
-            model="text-embedding-3-small",        # or "text-embedding-ada-002"
+            model=EVALUATOR_MODEL,
             client=openai_client,
-            interface="modern",                    # match collections pipeline
-        )
-        # TODO: Define an instance for each metric to evaluate
-        bleu_metric = BleuScore() # type: ignore
-        precision_metric = ContextPrecisionWithReference(evaluator_llm, evaluator_embeddings) # type: ignore
-        answer_relevancy_metric = AnswerRelevancy(evaluator_llm, evaluator_embeddings) # type: ignore
-        faithfulness_metric = Faithfulness(evaluator_llm, evaluator_embeddings) # type: ignore
-        rouge_metric = RougeScore() # type: ignore
-        
-        
-        
-        metrics: Sequence[Metric] = cast(Sequence[Metric], [ rouge_metric ])   # type: ignore
-        # metrics: Sequence[Metric] = [BleuScore(), RougeScore()]
-        
-        # TODO: Evaluate the response using the metrics
-        
-        sample = SingleTurnSample( # type: ignore
-            user_input = question,
-            retrieved_contexts = contexts,
-            response = answer
         )
         
-        dataset = EvaluationDataset(samples=[sample])# type: ignore
-
-        evaluation_results = evaluate(# type: ignore
-                dataset=dataset,
-                metrics=metrics,
-                llm=evaluator_llm,
-                embeddings=evaluator_embeddings,
-        ) 
+        # Create RAGAS native modern embeddings
+        evaluator_embeddings = OpenAIEmbeddings(
+            client=openai_client,
+            model=EMBEDDING_MODEL,
+        )
         
-        # TODO: Return the evaluation results
-        evaluation_scores = evaluation_results.scores[0]
-        return {
-            key: float(value)
-            for key, value in evaluation_scores.items()
-            if isinstance(value, (int, float)) and value == value
-        }
+        # Monkey-patch to inject dimensions into every embedding call
+        original_embed_texts = evaluator_embeddings.embed_texts
+        
+        def patched_embed_texts(texts, **kwargs):
+            kwargs['dimensions'] = EMBEDDING_SIZE
+            return original_embed_texts(texts, **kwargs)
+        
+        evaluator_embeddings.embed_texts = patched_embed_texts
+        
+        # Define metrics
+        bleu_metric = BleuScore()
+        precision_metric = ContextPrecisionWithReference(llm=evaluator_llm)
+        answer_relevancy_metric = AnswerRelevancy(llm=evaluator_llm, embeddings=evaluator_embeddings)
+        faithfulness_metric = Faithfulness(llm=evaluator_llm)
+        rouge_metric = RougeScore()
+        
+        # Score metrics using SYNC API (use .score() not .ascore())
+        results = {}
+        
+        # Non-LLM metrics: BLEU and ROUGE
+        bleu_result = bleu_metric.score(
+            reference=answer,
+            response=answer
+        )
+        results['bleu_score'] = bleu_result.value if hasattr(bleu_result, 'value') else float(bleu_result)
+        
+        rouge_result = rouge_metric.score(
+            reference=answer,
+            response=answer
+        )
+        results['rouge_score'] = rouge_result.value if hasattr(rouge_result, 'value') else float(rouge_result)
+        
+        # LLM-based metrics with SYNC API
+        precision_result = precision_metric.score(
+            user_input=question,
+            # response=answer,
+            retrieved_contexts=contexts,
+            reference=answer
+        )
+        results['context_precision'] = precision_result.value if hasattr(precision_result, 'value') else float(precision_result)
+        
+        relevancy_result = answer_relevancy_metric.score(
+            user_input=question,
+            response=answer,
+            retrieved_contexts=contexts
+        )
+        results['answer_relevancy'] = relevancy_result.value if hasattr(relevancy_result, 'value') else float(relevancy_result)
+        
+        faithfulness_result = faithfulness_metric.score(
+            user_input=question,
+            response=answer,
+            retrieved_contexts=contexts
+        )
+        results['faithfulness'] = faithfulness_result.value if hasattr(faithfulness_result, 'value') else float(faithfulness_result)
+        
+        return results

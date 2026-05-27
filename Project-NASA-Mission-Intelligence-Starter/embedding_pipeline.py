@@ -46,6 +46,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 OPENAI_API_KEY = os.getenv('OPENAI_API_VOCAREUM_KEY')
 OPENAI_BASE_URL = os.getenv('OPENAI_BASE_URL')
+EMBEDDING_DIMENSION = int(os.getenv('EMBEDDING_SIZE')) if os.getenv('EMBEDDING_SIZE') != '' else 1536 
 class ChromaEmbeddingPipelineTextOnly:
     """Pipeline for creating ChromaDB collections with OpenAI embeddings - Text files only"""
     
@@ -54,6 +55,7 @@ class ChromaEmbeddingPipelineTextOnly:
                  chroma_persist_directory: str = "./chroma_db",
                  collection_name: str = "nasa_space_missions_text",
                  embedding_model: str = "text-embedding-3-small",
+                 embedding_size: int = EMBEDDING_DIMENSION,
                  chunk_size: int = 1000,
                  chunk_overlap: int = 200):
         """
@@ -73,6 +75,7 @@ class ChromaEmbeddingPipelineTextOnly:
         # TODO: Store configuration parameters
         self.__config = {
             'embedding_model': embedding_model,
+            'embedding_size' : embedding_size,
             'chunk_size': chunk_size,
             'chunk_overlap': chunk_overlap,
             'collection_name': collection_name
@@ -253,7 +256,8 @@ class ChromaEmbeddingPipelineTextOnly:
         try:
             create_embedding_response = self.__openai_client.embeddings.create(
                 input=text,
-                model=self.__config['embedding_model']
+                model=self.__config['embedding_model'],
+                dimensions=self.__config['embedding_size']
             )
             # TODO: Return embedding vector
             return create_embedding_response.data[0].embedding
